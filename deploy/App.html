@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Convert Defect to Story</title>
+
+    <script type="text/javascript" src="/apps/2.0rc3/sdk.js"></script>
+
+    <script type="text/javascript">
+        Rally.onReady(function () {
+                Ext.define("CustomApp",{extend:"Rally.app.App",componentCls:"app",items:{html:'<a href="https://help.rallydev.com/apps/2.0rc3/doc/">App SDK 2.0rc3 Docs</a>'},_story:{},_defect:{},launch:function(){Ext.create("Rally.ui.dialog.SolrArtifactChooserDialog",{width:450,autoScroll:!0,height:525,title:"Select a Defect",pageSize:100,closable:!1,selectionButtonText:"Copy",artifactTypes:["Defect"],autoShow:!0,storeConfig:{fetch:["Name","ScheduleState","State","Priority","Severity","Tasks"]},listeners:{artifactchosen:function(dialog,selectedRecord){console.log(selectedRecord.data.FormattedID+", "+selectedRecord.data.Name+" was chosen"),this._story=selectedRecord.data,this._defect=selectedRecord.data,this.getStoryModel()},scope:this}})},getStoryModel:function(){Rally.data.ModelFactory.getModel({type:"UserStory",success:this.onStoryModelRetrieved,scope:this})},onStoryModelRetrieved:function(model){this.storyModel=model,this.createStory()},createStory:function(){var that=this,record=Ext.create(this.storyModel,{Name:this._story.Name,ScheduleState:this._story.ScheduleState});record.save({callback:function(result,operation){operation.wasSuccessful()?(that._storyOid=result.get("ObjectID"),that.getDefectModel()):console.log("error")}})},getDefectModel:function(){console.log("closing defect "+this._defect.FormattedID),Rally.data.ModelFactory.getModel({type:"defect",success:this.onDefectModelRetrieved,scope:this})},onDefectModelRetrieved:function(model){this.defectModel=model,this.closeDefect()},closeDefect:function(){var that=this;that._tasks=[];var defectOid=that._defect.ObjectID;this.defectModel.load(defectOid,{fetch:["State","Tasks"],callback:function(record,operation){if(record.get("Tasks").Count>0){console.log(record.get("Tasks").Count+" tasks will be moved from the defect to the story:");var tasksOfDefect=record.getCollection("Tasks");tasksOfDefect.load({callback:function(taskRecords,operation,success){_.each(taskRecords,function(taskRecord){var ref=taskRecord.get("_ref");that._tasks.push(ref),tasksOfDefect.remove({_ref:ref}),console.log("removed",ref)}),tasksOfDefect.sync({callback:function(){console.log("succcess")}}),record.set("State","Closed"),record.save({callback:function(record,operation){operation.wasSuccessful()?(console.log("defect state after update:",record.get("State")),that.updateTasksOnStory()):console.log("?")}})}})}}})},updateTasksOnStory:function(){var that=this;console.log("that._tasks",that._tasks),that.storyModel.load(that._storyOid,{fetch:["FormattedID","Tasks"],callback:function(record,operation){console.log("these tasks will be added to the story",record.get("FormattedID"),record);var tasksOfStory=record.getCollection("Tasks",{autoLoad:!0,listeners:{load:function(){_.each(that._tasks,function(ref){tasksOfStory.add({_ref:ref}),console.log("added",ref)}),tasksOfStory.sync({callback:function(){console.log("success")}})}}})}})}});
+
+            Rally.launchApp('CustomApp', {
+                name:"Convert Defect to Story",
+	            parentRepos:""
+            });
+
+        });
+    </script>
+
+
+    <style type="text/css">
+        .app {
+     /* Add app styles here */
+}
+
+    </style>
+</head>
+<body></body>
+</html>
